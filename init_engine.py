@@ -256,7 +256,11 @@ def update_gitignore():
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    """Serve the legacy initialization form (kept for backward compatibility)."""
+    """Serve the React frontend SPA if compiled, otherwise the legacy HTML template."""
+    dist_index = os.path.join(os.path.dirname(__file__), "frontend", "dist", "index.html")
+    if os.path.exists(dist_index):
+        with open(dist_index, "r") as f:
+            return f.read()
     return HTML_TEMPLATE
 
 
@@ -727,6 +731,29 @@ def fallback():
     </body>
     </html>
     """)
+
+# Mount static assets if frontend is built
+try:
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+    dist_dir = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+    if os.path.exists(dist_dir):
+        app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
+
+        @app.get("/favicon.svg")
+        def favicon():
+            return FileResponse(os.path.join(dist_dir, "favicon.svg"))
+
+        @app.get("/icons.svg")
+        def icons():
+            return FileResponse(os.path.join(dist_dir, "icons.svg"))
+
+        @app.get("/vite.svg")
+        def vite():
+            # Fallback to favicon.svg if vite.svg is requested
+            return FileResponse(os.path.join(dist_dir, "favicon.svg"))
+except Exception as e:
+    print(f"Warning: could not mount frontend assets: {e}")
 
 def run_cli():
     # Check if we are in a valid Git repository first
