@@ -472,14 +472,33 @@ class CodebaseScanner:
         Absolute path to the repository root.
     max_domains : int
         Maximum number of feature domains to discover (default 10).
+    progress_callback : callable, optional
+        Optional callable with signature ``(progress: int, message: str) -> None``.
+        Called periodically during long-running operations so callers (e.g. the
+        RQ worker) can stream live progress to a status store without coupling
+        the scanner to any specific tracking mechanism.
     """
 
     BUCKET = "cckb-data"
 
-    def __init__(self, repo_path: str, max_domains: int = 10):
+    def __init__(
+        self,
+        repo_path: str,
+        max_domains: int = 10,
+        progress_callback=None,
+    ):
         self.repo_path = os.path.abspath(repo_path)
         self.max_domains = max_domains
         self.framework = self._detect_framework()
+        self._progress_callback = progress_callback
+
+    def _emit_progress(self, progress: int, message: str) -> None:
+        """Fire the progress callback if one was provided; otherwise no-op."""
+        if callable(self._progress_callback):
+            try:
+                self._progress_callback(progress, message)
+            except Exception:
+                pass  # Never let a callback crash the scanner
 
     # ── Framework detection ──────────────────
 
@@ -691,18 +710,25 @@ Example Response format:
         First attempts dynamic LLM-driven discovery. If offline/fails,
         falls back to static framework heuristics.
         """
+        self._emit_progress(10, f"Detecting framework: {self.framework}")
+
         # Try dynamic LLM discovery first
+        self._emit_progress(15, "Running LLM-driven domain discovery...")
         domains = self._discover_domains_with_llm()
         if domains:
+            self._emit_progress(45, f"Discovered {len(domains)} domain(s) via LLM")
             return domains
 
         # Fallback to static rules
+        self._emit_progress(25, "LLM offline — using static heuristics")
         if self.framework == "nextjs":
-            return self._discover_nextjs_domains()
+            domains = self._discover_nextjs_domains()
         elif self.framework in ("fastapi", "flask", "python"):
-            return self._discover_python_domains()
+            domains = self._discover_python_domains()
         else:
-            return self._discover_generic_domains()
+            domains = self._discover_generic_domains()
+        self._emit_progress(45, f"Discovered {len(domains)} domain(s) via heuristics")
+        return domains
 
     def _discover_nextjs_domains(self) -> list[dict]:
         domains = []
@@ -1091,10 +1117,12 @@ Keep total length under 800 words."""
         spec_md   : str  — Markdown spec content
         spec_meta : dict — Metadata suitable for JSON serialisation
         """
+        self._emit_progress(-1, f"Generating spec for {domain.get('spec_id', '?')}...")
         deps = self.extract_dependencies(domain)
         static_md = self._build_static_spec(domain, deps)
 
         if use_llm and _is_ollama_online():
+            self._emit_progress(-1, f"Enhancing {domain.get('spec_id', '?')} with LLM...")
             spec_md = self._build_llm_spec(domain, deps, static_md)
         else:
             spec_md = static_md

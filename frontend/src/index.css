@@ -1,0 +1,260 @@
+/* ── Reset & tokens ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #0b0f19;
+  --surface:     rgba(17, 24, 39, 0.75);
+  --border:      rgba(255, 255, 255, 0.08);
+  --text:        #f3f4f6;
+  --muted:       #9ca3af;
+  --accent:      #6366f1;
+  --accent-light:#a5b4fc;
+  --success:     #10b981;
+  --danger:      #ef4444;
+  --warn:        #f59e0b;
+  --radius-lg:   24px;
+  --radius-md:   12px;
+  --font:        'Outfit', system-ui, sans-serif;
+  --shadow:      0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Page layout ──────────────────────────────────────────────────────────── */
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 12% 20%, rgba(30,58,138,.18) 0%, transparent 45%),
+    radial-gradient(circle at 88% 78%, rgba(99,102,241,.16) 0%, transparent 45%);
+  font-family: var(--font);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow);
+  animation: fadeUp .6s cubic-bezier(.16,1,.3,1) both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.logo {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
+.form label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--accent-light);
+  margin-bottom: 8px;
+}
+
+.form input[type="text"] {
+  width: 100%;
+  padding: 13px 16px;
+  background: rgba(31, 41, 55, 0.55);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  transition: border-color .25s, box-shadow .25s, background .25s;
+  margin-bottom: 20px;
+}
+
+.form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.25);
+  background: rgba(31,41,55,.85);
+}
+
+.error-msg {
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.28);
+  border-radius: var(--radius-md);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(99,102,241,.35);
+  transition: transform .2s, box-shadow .2s;
+}
+
+.btn-primary:hover  { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,.45); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  width: 100%;
+  padding: 13px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  margin-top: 16px;
+}
+
+.btn-secondary:hover { background: rgba(255,255,255,.1); }
+
+/* ── Status badge ─────────────────────────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dot-color, var(--accent));
+  margin-bottom: 20px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--accent));
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1);    }
+  50%       { opacity: .5; transform: scale(1.3); }
+}
+
+/* ── Progress bar ─────────────────────────────────────────────────────────── */
+.progress-view {
+  text-align: center;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #a5b4fc);
+  border-radius: 999px;
+  transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+
+.progress-pct {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent-light);
+  margin-bottom: 8px;
+}
+
+.progress-msg {
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 20px;
+}
+
+.job-id-label {
+  margin-top: 16px;
+  font-size: 11px;
+  color: rgba(156,163,175,.55);
+}
+
+.job-id-label code {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+/* ── Result views ─────────────────────────────────────────────────────────── */
+.result-view {
+  text-align: center;
+}
+
+.result-icon {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.result-view.success .result-icon { color: var(--success); }
+.result-view.failure .result-icon { color: var(--danger);  }
+
+.result-view h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.result-view.success h2 { color: var(--success); }
+.result-view.failure h2 { color: var(--danger);  }
+
+.result-msg {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 6px;
+  word-break: break-word;
+}

@@ -2,15 +2,17 @@
 import os
 import sys
 import time
+import uuid
 import socket
 import signal
 import threading
 import webbrowser
 import operator
 import boto3
-from typing import Annotated, TypedDict
-from fastapi import FastAPI, Form
-from fastapi.responses import HTMLResponse
+from typing import Annotated, TypedDict, Optional
+from fastapi import FastAPI, Form, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 import uvicorn
 
 # CCKB auto-spec generation
@@ -33,6 +35,17 @@ try:
     from langgraph.graph import StateGraph, START, END
 except ImportError:
     print("Warning: langchain-ollama or langgraph not installed.")
+
+# Redis / RQ (optional — falls back gracefully if not installed)
+try:
+    import redis as _redis_lib
+    from rq import Queue as _RQQueue
+    _RQ_AVAILABLE = True
+except ImportError:
+    _RQ_AVAILABLE = False
+
+# DB utils
+from db_utils import create_job, get_job_status, init_db
 
 app = FastAPI(title="CCKB Init Engine")
 
@@ -243,7 +256,79 @@ def update_gitignore():
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    """Serve the legacy initialization form (kept for backward compatibility)."""
     return HTML_TEMPLATE
+
+
+# ─────────────────────────────────────────────
+# Async Job API  (Phase 2 additions)
+# ─────────────────────────────────────────────
+
+class InitRequest(BaseModel):
+    repo_path: str
+
+
+def _get_redis_queue() -> Optional["_RQQueue"]:
+    """Return an RQ Queue connected to Redis, or None if unavailable."""
+    if not _RQ_AVAILABLE:
+        return None
+    try:
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+        conn = _redis_lib.from_url(redis_url)
+        conn.ping()  # Raise if Redis is not reachable
+        return _RQQueue("cckb", connection=conn)
+    except Exception:
+        return None
+
+
+@app.post("/init")
+def init_scan(req: InitRequest):
+    """
+    Enqueue a new async codebase scan job.
+
+    Accepts JSON: {"repo_path": "/abs/path/to/repo"}
+    Returns:      {"job_id": "<uuid>", "status": "queued"}
+    """
+    repo_path = req.repo_path.strip()
+    if not repo_path:
+        raise HTTPException(status_code=400, detail="repo_path must not be empty")
+
+    job_id = str(uuid.uuid4())
+    init_db()  # ensure table exists
+    create_job(job_id, repo_path)
+
+    queue = _get_redis_queue()
+    if queue is not None:
+        queue.enqueue("worker.run_codebase_scan", job_id, repo_path, job_id=job_id)
+    else:
+        # Redis unavailable — update status to reflect this
+        from db_utils import update_job_status
+        update_job_status(
+            job_id,
+            "failed",
+            0,
+            "Redis is unavailable. Start the Redis container and retry.",
+        )
+
+    return JSONResponse({"job_id": job_id, "status": "queued"})
+
+
+@app.get("/status/{job_id}")
+def job_status(job_id: str):
+    """
+    Retrieve the current status of an async scan job.
+
+    Returns: {"job_id": ..., "status": ..., "progress": ..., "message": ...}
+    """
+    row = get_job_status(job_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    return JSONResponse({
+        "job_id":   row["job_id"],
+        "status":   row["status"],
+        "progress": row["progress"],
+        "message":  row.get("message") or "",
+    })
 
 @app.post("/submit")
 def submit_credentials(jira_api_key: str = Form(None), notion_api_key: str = Form(None)):
