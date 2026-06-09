@@ -1,0 +1,9 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/shayne/Documents/local-cckb
+plugins: anyio-4.12.1, langsmith-0.4.37
+collected 9 items
+
+test_unit.py .                                                           [ 11%]
+test_e2e_storage.py .                                                    [ 22%]
+test_init_engine.py ..

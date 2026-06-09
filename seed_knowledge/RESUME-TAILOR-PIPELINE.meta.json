@@ -1,0 +1,41 @@
+{
+  "spec_id": "RESUME-TAILOR-PIPELINE",
+  "feature_name": "Core Resume Tailoring Pipeline",
+  "description": "The end-to-end resume tailoring pipeline: auth, parallel MCP pre-processing, AI generation (section-based or single-doc), post-processing sanitization chain, ATS scoring, obfuscation, and Supabase persistence via SSE streaming.",
+  "dependencies": [
+    { "type": "api_route", "name": "POST /api/humanize/stream", "file": "src/app/api/humanize/stream/route.ts" },
+    { "type": "api_route", "name": "POST /api/tailor", "file": "src/app/api/tailor/route.ts" },
+    { "type": "api_route", "name": "POST /api/pipeline", "file": "src/app/api/pipeline/route.ts" },
+    { "type": "config", "name": "INTENT_PIPELINES / getPipeline()", "file": "src/app/config/pipelines.ts" },
+    { "type": "prompt", "name": "getTailoringPrompt()", "file": "src/app/prompts/tailoring.ts" },
+    { "type": "prompt", "name": "getSummaryTailoringPrompt()", "file": "src/app/prompts/tailoringSection.ts" },
+    { "type": "prompt", "name": "getExperienceBulletsPrompt()", "file": "src/app/prompts/tailoringSection.ts" },
+    { "type": "prompt", "name": "buildUserInstructions()", "file": "src/app/prompts/tailoringPresets.ts" },
+    { "type": "util", "name": "executeParallel() / callMCPTool()", "file": "src/app/utils/mcp-tools.ts" },
+    { "type": "util", "name": "generateWithFallback()", "file": "src/app/services/model-fallback.ts" },
+    { "type": "util", "name": "reassembleResumeFromSections()", "file": "src/app/utils/resumeReassemble.ts" },
+    { "type": "util", "name": "sanitizeResumeForATS()", "file": "src/app/utils/atsSanitizer.ts" },
+    { "type": "util", "name": "deduplicateResumeSections()", "file": "src/app/utils/resumeSectionDedupe.ts" },
+    { "type": "util", "name": "rewriteParentheticalKeywords()", "file": "src/app/utils/keywordParenthesesCleaner.ts" },
+    { "type": "util", "name": "validateOrFixEducationBlock()", "file": "src/app/utils/educationValidator.ts" },
+    { "type": "util", "name": "sanitizeContactBlock() / replaceContactBlock()", "file": "src/app/utils/contactBlockSanitizer.ts" },
+    { "type": "util", "name": "obfuscateResume()", "file": "src/app/utils/resumeObfuscator.ts" },
+    { "type": "util", "name": "requireAuth() / verifyUserIdMatch()", "file": "src/app/utils/auth.ts" },
+    { "type": "util", "name": "checkApiRateLimit() / trackRateLimitHit() / estimateTokens()", "file": "src/app/utils/apiRateLimiter.ts" },
+    { "type": "util", "name": "parseJSONFromText() / extractTailoredResumeFromText()", "file": "src/app/utils/json-extractor.ts" },
+    { "type": "util", "name": "computeKeywordGap()", "file": "src/app/api/humanize/stream/route.ts" },
+    { "type": "database", "name": "supabaseAdmin.from('resumes').insert()", "file": "src/app/lib/supabase/server.ts" }
+  ],
+  "mcp_tools_used": [
+    "/api/mcp-tools/keyword-extractor",
+    "/api/mcp-tools/resume-parser",
+    "/api/mcp-tools/company-research",
+    "/api/mcp-tools/metrics-context",
+    "/api/mcp-tools/relevancy-scorer",
+    "/api/mcp-tools/resume-validator",
+    "/api/mcp-tools/format-recommender"
+  ],
+  "pipelines": ["apply_to_job", "full_optimization"],
+  "sse_events": ["status", "section", "complete", "error"],
+  "tags": ["tailoring", "resume", "pipeline", "LLM", "ATS", "streaming", "SSE", "scoring", "auth"]
+}

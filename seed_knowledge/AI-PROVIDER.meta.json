@@ -1,0 +1,24 @@
+{
+  "spec_id": "AI-PROVIDER",
+  "feature_name": "Multi-Provider AI Generation Layer",
+  "description": "Abstract AI provider layer supporting OpenAI, Anthropic, Gemini, Cerebras, DeepSeek, Groq, Mistral, HuggingFace, OpenRouter. Handles model selection, API key resolution (BYOK + env), retry/fallback chains, and rate limit handling. Used by all AI generation calls in the tailoring pipeline.",
+  "dependencies": [
+    { "type": "service", "name": "createProvider() / getModelProvider() / generateContentWithFallback()", "file": "src/app/services/ai-provider.ts" },
+    { "type": "service", "name": "generateWithFallback()", "file": "src/app/services/model-fallback.ts" },
+    { "type": "service", "name": "isRateLimitError() / isModelUnavailableError()", "file": "src/app/services/error-utils.ts" },
+    { "type": "provider", "name": "OpenAIProvider", "file": "src/app/services/providers/openai.ts" },
+    { "type": "provider", "name": "AnthropicProvider", "file": "src/app/services/providers/anthropic.ts" },
+    { "type": "provider", "name": "GeminiProvider", "file": "src/app/services/providers/gemini.ts" },
+    { "type": "provider", "name": "CerebrasProvider", "file": "src/app/services/providers/cerebras.ts" },
+    { "type": "provider", "name": "DeepSeekProvider", "file": "src/app/services/providers/deepseek.ts" },
+    { "type": "provider", "name": "GroqProvider", "file": "src/app/services/providers/groq.ts" },
+    { "type": "provider", "name": "MistralProvider", "file": "src/app/services/providers/mistral.ts" },
+    { "type": "provider", "name": "HuggingFaceProvider", "file": "src/app/services/providers/huggingface.ts" },
+    { "type": "provider", "name": "OpenRouterProvider", "file": "src/app/services/providers/openrouter.ts" },
+    { "type": "config", "name": "getModelConfig() / parseModelKey() / DEFAULT_MODEL", "file": "src/app/config/models.ts" },
+    { "type": "config", "name": "models-client (safe subset)", "file": "src/app/config/models-client.ts" },
+    { "type": "util", "name": "getModelFromSession()", "file": "src/app/utils/model-helper.ts" },
+    { "type": "type", "name": "AIProvider / ModelOptions / GenerateContentResult", "file": "src/app/types/model.ts" }
+  ],
+  "tags": ["AI", "LLM", "provider", "OpenAI", "Anthropic", "Gemini", "Cerebras", "fallback", "BYOK", "rate-limit"]
+}

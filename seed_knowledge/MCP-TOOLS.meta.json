@@ -1,0 +1,22 @@
+{
+  "spec_id": "MCP-TOOLS",
+  "feature_name": "Deterministic MCP Tool Suite",
+  "description": "Set of deterministic, non-AI API endpoints under /api/mcp-tools/ for keyword extraction, resume parsing, company research, relevancy scoring, validation, and format recommendation. Called in parallel before and after LLM generation.",
+  "dependencies": [
+    { "type": "api_route", "name": "POST /api/mcp-tools/keyword-extractor", "file": "src/app/api/mcp-tools/keyword-extractor/route.ts" },
+    { "type": "api_route", "name": "POST /api/mcp-tools/resume-parser", "file": "src/app/api/mcp-tools/resume-parser/route.ts" },
+    { "type": "api_route", "name": "POST /api/mcp-tools/company-research", "file": "src/app/api/mcp-tools/company-research/route.ts" },
+    { "type": "api_route", "name": "POST /api/mcp-tools/metrics-context", "file": "src/app/api/mcp-tools/metrics-context/route.ts" },
+    { "type": "api_route", "name": "POST /api/mcp-tools/relevancy-scorer", "file": "src/app/api/mcp-tools/relevancy-scorer/route.ts" },
+    { "type": "api_route", "name": "POST /api/mcp-tools/resume-validator", "file": "src/app/api/mcp-tools/resume-validator/route.ts" },
+    { "type": "api_route", "name": "POST /api/mcp-tools/format-recommender", "file": "src/app/api/mcp-tools/format-recommender/route.ts" },
+    { "type": "util", "name": "executeParallel() / callMCPTool() / generateCacheKey()", "file": "src/app/utils/mcp-tools.ts" },
+    { "type": "util", "name": "looksLikeCompanyName()", "file": "src/app/utils/companyNameValidator.ts" },
+    { "type": "api_route", "name": "POST /api/tools/format-validator", "file": "src/app/api/tools/format-validator/route.ts" },
+    { "type": "api_route", "name": "POST /api/tools/ats-simulator", "file": "src/app/api/tools/ats-simulator/route.ts" },
+    { "type": "api_route", "name": "POST /api/tools/skills-gap", "file": "src/app/api/tools/skills-gap/route.ts" },
+    { "type": "api_route", "name": "POST /api/tools/interview-prep", "file": "src/app/api/tools/interview-prep/route.ts" },
+    { "type": "api_route", "name": "MCP Server", "file": "src/app/api/mcp/route.ts" }
+  ],
+  "tags": ["mcp", "tools", "keyword-extraction", "resume-parser", "ATS-scoring", "validation", "deterministic", "parallel"]
+}
