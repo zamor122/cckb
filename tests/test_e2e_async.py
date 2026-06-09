@@ -7,16 +7,10 @@ End-to-End test for the full async job lifecycle:
 
 Uses:
   - fakeredis.FakeRedis      (no live Redis required)
-  - Direct task execution    (calls run_codebase_scan() in a background thread,
-                              bypassing RQ's SimpleWorker which has a known
-                              KeyError with some fakeredis versions)
+  - Direct task execution    (calls run_codebase_scan() directly in a background
+                              thread with job metadata captured at enqueue time)
   - FastAPI TestClient       (in-process ASGI, no live uvicorn required)
   - A temp SQLite DB         (isolated from production state)
-
-The init_engine's /init route enqueues to fakeredis; the test's background thread
-manually dequeues and calls the task function, exactly mirroring what a real worker
-would do. This approach tests the full lifecycle (status transitions, DB writes,
-HTTP polling) without external infrastructure.
 
 Timeout: 60 seconds per spec requirement.
 Run with: ../.venv/bin/pytest tests/test_e2e_async.py -v
@@ -24,7 +18,6 @@ Run with: ../.venv/bin/pytest tests/test_e2e_async.py -v
 
 import os
 import sys
-import uuid
 import time
 import threading
 import pytest
@@ -71,28 +64,21 @@ def client():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _dequeue_and_execute(rq_queue, db_path: str, extra_patches: dict = None):
+def _run_task_direct(
+    job_id: str,
+    repo_path: str,
+    db_path: str,
+    extra_patches: dict = None,
+):
     """
-    Dequeue the first job from the RQ queue and execute run_codebase_scan
-    directly in this thread (bypassing RQ worker internals that may be
-    incompatible with fakeredis).
+    Call run_codebase_scan() directly in the current thread with optional patches.
+    Job metadata is passed explicitly to avoid any RQ/fakeredis version issues.
 
-    extra_patches: dict of {target_string: mock_value} applied via patch()
+    extra_patches: dict of {patch_target: mock_object}
     """
     os.environ["CCKB_DB_PATH"] = db_path
-    job = rq_queue.fetch_job_ids()
-    if not job:
-        return
-    # Grab the enqueued job from fakeredis without using a Worker
-    rq_job = rq_queue.dequeue()
-    if rq_job is None:
-        return
-
-    job_id   = rq_job.args[0]
-    repo_path = rq_job.args[1]
 
     if extra_patches:
-        # Build a nested context manager from the extra patches
         patches = [patch(k, v) for k, v in extra_patches.items()]
         for p in patches:
             p.start()
@@ -144,13 +130,23 @@ def _make_mock_scanner():
     return mock_scanner
 
 
+def _base_patches(mock_scanner_cls):
+    """Return the standard success-case patches dict."""
+    return {
+        "worker.run_code_first_fallback": MagicMock(return_value="# Constitution"),
+        "worker.boto3": MagicMock(),
+        "worker.install_hook": MagicMock(),
+        "worker.CodebaseScanner": mock_scanner_cls,
+    }
+
+
 # ── E2E Tests ─────────────────────────────────────────────────────────────────
 
 class TestE2EAsyncLifecycle:
     """Full lifecycle tests: queued → processing → completed."""
 
     def test_queued_to_completed_lifecycle(
-        self, client, tmp_db, fake_redis_server, rq_queue, monkeypatch
+        self, client, tmp_db, rq_queue, monkeypatch
     ):
         """
         Step 1: POST /init  → get job_id with status='queued'
@@ -171,23 +167,15 @@ class TestE2EAsyncLifecycle:
             job_id = data["job_id"]
             assert data["status"] == "queued"
 
-        # Start background thread to execute the task
-        extra = {
-            "worker.run_code_first_fallback": MagicMock(return_value="# Constitution"),
-            "worker.boto3": MagicMock(),
-            "worker.install_hook": MagicMock(),
-        }
-        # CodebaseScanner needs special handling since it's a class
-        with patch("worker.CodebaseScanner", mock_scanner_cls):
-            worker_thread = threading.Thread(
-                target=_dequeue_and_execute,
-                args=(rq_queue, tmp_db),
-                kwargs={"extra_patches": extra},
-                daemon=True,
-            )
-            worker_thread.start()
-            final_status = _wait_for_terminal_status(job_id, tmp_db, TIMEOUT_SECONDS)
-            worker_thread.join(timeout=10)
+        worker_thread = threading.Thread(
+            target=_run_task_direct,
+            args=(job_id, "/tmp/e2e-test-repo", tmp_db),
+            kwargs={"extra_patches": _base_patches(mock_scanner_cls)},
+            daemon=True,
+        )
+        worker_thread.start()
+        final_status = _wait_for_terminal_status(job_id, tmp_db, TIMEOUT_SECONDS)
+        worker_thread.join(timeout=10)
 
         assert final_status != "timeout", (
             f"Job {job_id} did not reach a terminal status within {TIMEOUT_SECONDS}s"
@@ -199,7 +187,7 @@ class TestE2EAsyncLifecycle:
         assert row["status"] == "completed"
 
     def test_status_transitions_observed(
-        self, client, tmp_db, fake_redis_server, rq_queue, monkeypatch
+        self, client, tmp_db, rq_queue, monkeypatch
     ):
         """
         Assert that the status transitions from queued → processing → completed.
@@ -216,35 +204,30 @@ class TestE2EAsyncLifecycle:
             job_id = res.json()["job_id"]
 
         observed_statuses = []
-        extra = {
-            "worker.run_code_first_fallback": MagicMock(return_value="# Constitution"),
-            "worker.boto3": MagicMock(),
-            "worker.install_hook": MagicMock(),
-        }
-        with patch("worker.CodebaseScanner", mock_scanner_cls):
-            worker_thread = threading.Thread(
-                target=_dequeue_and_execute,
-                args=(rq_queue, tmp_db),
-                kwargs={"extra_patches": extra},
-                daemon=True,
-            )
-            worker_thread.start()
 
-            # Poll and record all observed status values
-            deadline = time.monotonic() + TIMEOUT_SECONDS
-            last_status = None
-            while time.monotonic() < deadline:
-                row = get_job_status(job_id, db_path=tmp_db)
-                if row:
-                    s = row["status"]
-                    if s != last_status:
-                        observed_statuses.append(s)
-                        last_status = s
-                    if s in ("completed", "failed"):
-                        break
-                time.sleep(POLL_INTERVAL)
+        worker_thread = threading.Thread(
+            target=_run_task_direct,
+            args=(job_id, "/tmp/transitions-repo", tmp_db),
+            kwargs={"extra_patches": _base_patches(mock_scanner_cls)},
+            daemon=True,
+        )
+        worker_thread.start()
 
-            worker_thread.join(timeout=10)
+        # Poll and record all observed status values
+        deadline = time.monotonic() + TIMEOUT_SECONDS
+        last_status = None
+        while time.monotonic() < deadline:
+            row = get_job_status(job_id, db_path=tmp_db)
+            if row:
+                s = row["status"]
+                if s != last_status:
+                    observed_statuses.append(s)
+                    last_status = s
+                if s in ("completed", "failed"):
+                    break
+            time.sleep(POLL_INTERVAL)
+
+        worker_thread.join(timeout=10)
 
         assert "queued" in observed_statuses, f"Never saw 'queued'. Observed: {observed_statuses}"
         assert "completed" in observed_statuses, (
@@ -254,7 +237,7 @@ class TestE2EAsyncLifecycle:
         assert observed_statuses.index("queued") < observed_statuses.index("completed")
 
     def test_failed_job_captured_within_timeout(
-        self, client, tmp_db, fake_redis_server, rq_queue, monkeypatch
+        self, client, tmp_db, rq_queue, monkeypatch
     ):
         """
         If the worker raises an exception, the job must reach 'failed' status
@@ -267,13 +250,19 @@ class TestE2EAsyncLifecycle:
             res = client.post("/init", json={"repo_path": "/tmp/fail-repo"})
             job_id = res.json()["job_id"]
 
-        # Use a MagicMock that raises when called
-        raising_fn = MagicMock(side_effect=RuntimeError("Deliberate failure for E2E test"))
+        # Patch CodebaseScanner to raise; this propagates to the outer try/except
+        # and sets status='failed' with the correct error message.
+        failing_patches = {
+            "worker.CodebaseScanner": MagicMock(
+                side_effect=RuntimeError("Deliberate failure for E2E test")
+            ),
+            "worker.boto3": MagicMock(),
+        }
 
         worker_thread = threading.Thread(
-            target=_dequeue_and_execute,
-            args=(rq_queue, tmp_db),
-            kwargs={"extra_patches": {"worker.run_code_first_fallback": raising_fn}},
+            target=_run_task_direct,
+            args=(job_id, "/tmp/fail-repo", tmp_db),
+            kwargs={"extra_patches": failing_patches},
             daemon=True,
         )
         worker_thread.start()
@@ -286,7 +275,7 @@ class TestE2EAsyncLifecycle:
         assert "Deliberate failure" in row["message"]
 
     def test_get_status_endpoint_returns_correct_data_during_poll(
-        self, client, tmp_db, fake_redis_server, rq_queue, monkeypatch
+        self, client, tmp_db, rq_queue, monkeypatch
     ):
         """
         Validate the /status/{job_id} HTTP endpoint returns the expected JSON
@@ -314,21 +303,15 @@ class TestE2EAsyncLifecycle:
             assert status_data["job_id"] == job_id
             assert status_data["status"] == "queued"
 
-        extra = {
-            "worker.run_code_first_fallback": MagicMock(return_value="# Constitution"),
-            "worker.boto3": MagicMock(),
-            "worker.install_hook": MagicMock(),
-        }
-        with patch("worker.CodebaseScanner", mock_scanner_cls):
-            worker_thread = threading.Thread(
-                target=_dequeue_and_execute,
-                args=(rq_queue, tmp_db),
-                kwargs={"extra_patches": extra},
-                daemon=True,
-            )
-            worker_thread.start()
-            final_status = _wait_for_terminal_status(job_id, tmp_db, TIMEOUT_SECONDS)
-            worker_thread.join(timeout=10)
+        worker_thread = threading.Thread(
+            target=_run_task_direct,
+            args=(job_id, "/tmp/poll-repo", tmp_db),
+            kwargs={"extra_patches": _base_patches(mock_scanner_cls)},
+            daemon=True,
+        )
+        worker_thread.start()
+        final_status = _wait_for_terminal_status(job_id, tmp_db, TIMEOUT_SECONDS)
+        worker_thread.join(timeout=10)
 
         # Final status via HTTP endpoint
         final_res = client.get(f"/status/{job_id}")

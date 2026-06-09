@@ -154,8 +154,9 @@ class TestRunCodebaseScanFailure:
         monkeypatch.setenv("CCKB_DB_PATH", db_path)
 
         with (
-            patch("worker.run_code_first_fallback", side_effect=RuntimeError("Git error")),
+            patch("worker.run_code_first_fallback", return_value="# Constitution"),
             patch("worker.boto3"),
+            patch("worker.CodebaseScanner", side_effect=RuntimeError("Git error")),
         ):
             with pytest.raises(RuntimeError):
                 worker.run_codebase_scan(job_id, repo_path, db_path=db_path)
@@ -184,8 +185,9 @@ class TestRunCodebaseScanFailure:
         monkeypatch.setenv("CCKB_DB_PATH", db_path)
 
         with (
-            patch("worker.run_code_first_fallback", side_effect=Exception("Unique error XYZ")),
+            patch("worker.run_code_first_fallback", return_value="# Constitution"),
             patch("worker.boto3"),
+            patch("worker.CodebaseScanner", side_effect=Exception("Unique error XYZ")),
         ):
             with pytest.raises(Exception):
                 worker.run_codebase_scan(job_id, repo_path, db_path=db_path)
