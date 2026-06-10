@@ -183,7 +183,19 @@ def run_codebase_scan(job_id: str, repo_path: str, db_path: str = None) -> None:
 
 if __name__ == "__main__":
     import redis as redis_lib
-    from rq import Worker, Queue
+    import sys
+    
+    # Disable macOS fork safety check that causes SIGSEGV when libraries like gRPC/urllib are loaded
+    os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+    
+    if sys.platform == "darwin":
+        from rq import SimpleWorker as Worker
+        logger.info("Running on macOS — using SimpleWorker (non-forking) for stability")
+    else:
+        from rq import Worker
+        logger.info("Running on non-macOS — using standard forking Worker")
+
+    from rq import Queue
 
     conn = get_redis_conn()
     queue = Queue("cckb", connection=conn)
