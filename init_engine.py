@@ -303,6 +303,11 @@ def init_scan(req: InitRequest):
             raise HTTPException(status_code=400, detail=f"Path '{repo_path}' does not exist")
         if not os.path.isdir(repo_path):
             raise HTTPException(status_code=400, detail=f"Path '{repo_path}' is not a directory")
+        try:
+            from git import Repo
+            Repo(repo_path)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Path '{repo_path}' is not a valid Git repository")
 
     job_id = str(uuid.uuid4())
     init_db()  # ensure table exists
