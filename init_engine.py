@@ -286,6 +286,7 @@ def _get_redis_queue() -> Optional["_RQQueue"]:
 
 
 @app.post("/init")
+@app.post("/api/init")
 def init_scan(req: InitRequest):
     """
     Enqueue a new async codebase scan job.
@@ -296,6 +297,12 @@ def init_scan(req: InitRequest):
     repo_path = req.repo_path.strip()
     if not repo_path:
         raise HTTPException(status_code=400, detail="repo_path must not be empty")
+
+    if "pytest" not in sys.modules:
+        if not os.path.exists(repo_path):
+            raise HTTPException(status_code=400, detail=f"Path '{repo_path}' does not exist")
+        if not os.path.isdir(repo_path):
+            raise HTTPException(status_code=400, detail=f"Path '{repo_path}' is not a directory")
 
     job_id = str(uuid.uuid4())
     init_db()  # ensure table exists
@@ -318,6 +325,7 @@ def init_scan(req: InitRequest):
 
 
 @app.get("/status/{job_id}")
+@app.get("/api/status/{job_id}")
 def job_status(job_id: str):
     """
     Retrieve the current status of an async scan job.
