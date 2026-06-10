@@ -141,8 +141,8 @@ class TestGetStatus:
 
 class TestUnitInitEngine(unittest.TestCase):
     @patch("init_engine.Repo")
-    @patch("init_engine.OllamaLLM")
-    def test_run_code_first_fallback_langgraph(self, mock_ollama_class, mock_repo_class):
+    @patch("llm_client.get_llm")
+    def test_run_code_first_fallback_langgraph(self, mock_get_llm, mock_repo_class):
         mock_repo = MagicMock()
         mock_repo_class.return_value = mock_repo
         mock_commit = MagicMock()
@@ -157,7 +157,7 @@ class TestUnitInitEngine(unittest.TestCase):
         mock_commit.parents[0].diff.return_value = [mock_diff]
         mock_repo.iter_commits.return_value = [mock_commit]
         mock_llm_instance = MagicMock()
-        mock_ollama_class.return_value = mock_llm_instance
+        mock_get_llm.return_value = mock_llm_instance
         mock_llm_instance.invoke.side_effect = [
             "Summary: Added sum helper.",
             "# Project Constitution (Hot Memory)\n\n## 1. Architectural Design & Project Structure\n- Modular python helpers.\n\n## 2. Key Styling Patterns\n- None\n\n## 3. Implementation Conventions\n- Uses sum helper.",

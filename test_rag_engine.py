@@ -88,7 +88,7 @@ class TestUnitRAGEngine(unittest.TestCase):
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = '{"implicated_features": [], "clarification_needed": true, "clarification_message": "Query is too broad. Please narrow down."}'
         
-        with patch('rag_engine.OllamaLLM', return_value=mock_llm):
+        with patch('llm_client.get_llm', return_value=mock_llm):
             with patch('rag_engine.is_ollama_online', return_value=True):
                 result = self.app_graph.invoke({
                     "intent": "Explain the whole system in detail",

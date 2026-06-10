@@ -43,14 +43,10 @@ def get_s3_client():
         region_name='us-east-1'
     )
 
-# Helper to check if Ollama is online
+# Helper to check if LLM is online
 def is_ollama_online():
-    import urllib.request
-    try:
-        urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=2)
-        return True
-    except Exception:
-        return False
+    from llm_client import is_llm_online
+    return is_llm_online()
 
 # 1. State Definition
 class AgentState(TypedDict):
@@ -166,7 +162,8 @@ Rules:
 """
 
     try:
-        llm = OllamaLLM(model="llama3.2:3b", base_url="http://127.0.0.1:11434", timeout=30)
+        from llm_client import get_llm
+        llm = get_llm(timeout=30)
         response_text = llm.invoke(prompt)
         
         # Parse JSON

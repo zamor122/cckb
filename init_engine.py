@@ -413,14 +413,10 @@ class GraphState(TypedDict):
     batch_summaries: Annotated[list[str], operator.add]
     final_markdown: str
 
-# Helper to check if Ollama is online
+# Helper to check if LLM is online
 def is_ollama_online():
-    import urllib.request
-    try:
-        urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=2)
-        return True
-    except Exception:
-        return False
+    from llm_client import is_llm_online
+    return is_llm_online()
 
 # LangGraph nodes
 def summarize_batch_node(state: GraphState):
@@ -450,7 +446,8 @@ Provide a concise, bulleted summary of your findings.
     summary = ""
     if is_ollama_online():
         try:
-            llm = OllamaLLM(model="llama3.2:3b", base_url="http://127.0.0.1:11434", timeout=30)
+            from llm_client import get_llm
+            llm = get_llm(timeout=30)
             summary = llm.invoke(prompt)
         except Exception as e:
             print(f"Ollama invocation error: {e}", file=sys.stderr)
@@ -511,7 +508,8 @@ Ensure there are no placeholders and the document reads like a production-ready 
 """
     
     try:
-        llm = OllamaLLM(model="llama3.2:3b", base_url="http://127.0.0.1:11434", timeout=45)
+        from llm_client import get_llm
+        llm = get_llm(timeout=45)
         final_md = llm.invoke(prompt)
     except Exception as e:
         print(f"Ollama synthesis error: {e}", file=sys.stderr)

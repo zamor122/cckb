@@ -60,11 +60,8 @@ def _get_s3_client(repo_path: str):
 
 
 def _is_ollama_online() -> bool:
-    try:
-        urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=2)
-        return True
-    except Exception:
-        return False
+    from llm_client import is_llm_online
+    return is_llm_online()
 
 
 # ─────────────────────────────────────────────
@@ -604,7 +601,7 @@ class CodebaseScanner:
             return []
             
         try:
-            from langchain_ollama import OllamaLLM
+            from llm_client import get_llm
         except ImportError:
             return []
             
@@ -640,7 +637,7 @@ Example Response format:
 ]
 """
         try:
-            llm = OllamaLLM(model="llama3.2:3b", base_url="http://127.0.0.1:11434", timeout=45)
+            llm = get_llm(timeout=45)
             response_text = llm.invoke(prompt).strip()
             
             # Clean response text in case LLM outputs markdown code blocks
@@ -1044,7 +1041,7 @@ Example Response format:
         and richer Processing Steps narrative.
         """
         try:
-            from langchain_ollama import OllamaLLM  # type: ignore
+            from llm_client import get_llm
         except ImportError:
             return static_md
 
@@ -1089,7 +1086,7 @@ Format as Markdown. Be specific and technical. Do not add sections that aren't r
 Keep total length under 800 words."""
 
         try:
-            llm = OllamaLLM(model="llama3.2:3b", base_url="http://127.0.0.1:11434", timeout=45)
+            llm = get_llm(timeout=45)
             llm_content = llm.invoke(prompt)
 
             # Splice the LLM content into the static spec after the Overview header
